@@ -1,0 +1,38 @@
+VIA
+VIA_Samuel port 9051
+
+Palantir
+Palantir_Samuel port 9052
+
+Monocle3
+monocle3_ahmad port 9055
+
+STREAM
+STREAM_ahmad port 9056
+
+PAGA
+PAGA_ahmad port 9057
+
+velocyto/scvelo/dynamo
+scvelo_ahmad port 9060
+
+R data analysis and preprocessing
+rstudio_ahmad port 7227
+
+Login for RStudio containers:
+rstudio/pass1234
+
+Login procedure for jupyter containers:
+- ssh into the server
+- make sure the container is started ('docker start [name]')
+- run the command 'docker exec -it [name] /bin/bash' to access the container as root
+- inside the container, run 'jupyter notebook --ip 0.0.0.0 --port 8888 --no-browser --allow-root'
+- a URL in the form 'http://127.0.0.1:8888/?token=[token]' will display
+- open the container by typing the address in a browser (10.7.67.5:PortID), there should be a login page with one field (it will not work if you try to click the displayed URL)
+- paste the token in the field to log in
+
+Command used to create RStudio containers:
+docker run --name [name] --memory="200g" --cpus="20.0" -d -p [PortID]:8787 -v /path/to/workdir/:/home/rstudio -e PASSWORD=pass1234 rocker/rstudio
+
+Command used to create jupyter containers:
+docker run --name [name] --memory="200g" --cpus="20.0" --entrypoint /bin/bash -p [PortID]:8888 --user root -e NB_GID=100 -e GEN_CERT=yes -e GRANT_SUDO=yes -v /path/to/workdir/:/data -w /data -it jupyter/minimal-notebook
