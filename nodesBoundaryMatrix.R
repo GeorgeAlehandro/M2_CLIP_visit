@@ -64,16 +64,7 @@ containsNode<- function(node, listOfNodes){
   }
     return(FALSE)
 }
-# for (i in 1:(length(shape)-1)){
-#   
-#   for (j in 1:length(selecting)){
-#     
-#   }
-#   print(paste(shape[i],shape[i+1]))
-#   
-#   
-#   possible.columns<- append(possible.columns, paste(shape[i],shape[i+1]))
-# }
+
 listOfNodes <- list(node1,node2, node3, node4, node5, node6, node7)
 extractPairs <- function(node, returnedPairs){
   for (neighbourNode in node$edges){
