@@ -98,8 +98,4 @@ for (eachNodeInTriangle in triangle123){
   extractedPairsFromTriangle <- extractPairsFromTriangle(eachNodeInTriangle, extractedPairsFromTriangle,triangle123)
 }
 
-matchVectors(pairs, query){
-  
-}
-nameddd <- as.vector("[1,2,3]")
 df <- data.frame(vectorww = extractedPairs, Shape123 = extractedPairs %in% extractedPairsFromTriangle)
