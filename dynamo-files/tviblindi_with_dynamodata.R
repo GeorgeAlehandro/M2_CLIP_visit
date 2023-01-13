@@ -1,13 +1,14 @@
 
 
-data<-readRDS("/data/hematopoiesis_PCA.RDS")
-group_id<-readRDS("/data/hematopoiesis_cell_type.RDS")
-thematrrixumap<-readRDS("/data/hematopoiesis_UMAP.RDS")
+data<-readRDS("/data/results/Hematopoiesis/hematopoiesis_PCA.RDS")
+group_id<-readRDS("/data/results/Hematopoiesis/hematopoiesis_cell_type.RDS")
+thematrrixumap<-readRDS("/data/results/Hematopoiesis/hematopoiesis_UMAP.RDS")
 library(tviblindi)
 tv1<-tviblindi(data=data,labels=group_id)
 DimRed(tv1)
-DimRed(tv1,method="umap",layout = thematrrixumap)
+DimRed(tv1,method="umap")
 DimRed(tv1,layout = thematrrixumap)
+# make layout col and rownames NULL
 Set_origin(tv1,label = "HSC",origin_name = "HSC_hitting_time")
 Set_origin(tv1,label = "HSC",origin_name = "HSC_hitting_distance")
 
