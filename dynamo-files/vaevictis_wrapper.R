@@ -37,5 +37,28 @@ ggplot()+
   geom_point(data=vaevictis_points,aes(V1,V2,color=celltypes))+
   p
 
+library(dplyr)
+# Create an empty list to store the plots
+plots <- list()
+
+for (celltype in unique(vaevictis_points$celltypes)){
+  print(celltype)
+  df_subset <- vaevictis_points %>% filter(celltypes==celltype)
+  p<-ggplot()+
+    geom_point(data=df_subset,aes(V1,V2,color=celltypes))+
+    ggtitle(celltype)+
+    scale_x_continuous(limits=c(-5.2, 4.5))+
+    scale_y_continuous(limits=c(-4.8, 3.5))
+  plots[[celltype]] <-p
+}
+library(gridExtra)
+grid.arrange(grobs = plots)
+
+
+ggplot()+
+  geom_point(data=vaevictis_velocity,aes(V1,V2,color=celltypes))
+
+ggplot()+
+  geom_point(data=subset(vaevictis_velocity,celltypes=="Bas"),aes(V1,V2,color=celltypes))
 
 
