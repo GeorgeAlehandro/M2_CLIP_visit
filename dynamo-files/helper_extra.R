@@ -26,21 +26,29 @@ calculate_alpha <- function(Lap, Astar, VD, IndexOfOriginCell) {
   return(alpha)
 }
 
+calculate_alpha_pseudo_inverse <- function(Lap, Astar, VD) {
+  right_hand <- -(Astar%*%VD)
+  left_hand <- Lap
+  leftI<-pracma::pinv(as.matrix(left_hand))
+  alpha<-leftI%*%right_hand
+  return(alpha)
+}
 
-get_pseudotime_from_velocity <- function(tv1,nearest_neighbour_number, IndexOfRootCell) {
+get_pseudotime_from_velocity <- function(tv1,nearest_neighbour_number, IndexOfRootCell=NULL, MatrixOfVelocity = "RDS") {
   # create graph and extract edges from transition matrix
   graph <- create_graph_from_transition_matrix(tv1, nearest_neighbour_number)
   G <- graph[[1]]
   listOfEdges <- graph[[2]]
-  # calculate Laplacian and RHS
-  laplacian_result <- build_Laplacian_and_RHS(transition_matrix, IndexOfRootCell)
-  
   # calculate complex and boundary
   flt<-c(1:nrow(tv1$data),listOfEdges)
   B<-calculate_complex_and_boundary(flt)
   
   # load data
-  V<-readRDS("/data/results/Hematopoiesis/hematopoiesis_PCA_velocity.RDS")
+  if (MatrixOfVelocity == "RDS"){
+    V<-readRDS("/data/results/Hematopoiesis/hematopoiesis_PCA_velocity.RDS")}
+  else{
+    V <- MatrixOfVelocity
+  }
   X<-tv1$data
   VD<-deRahmMap1f(B = B,X = X,V = V)
   
@@ -51,19 +59,30 @@ get_pseudotime_from_velocity <- function(tv1,nearest_neighbour_number, IndexOfRo
   Lap_and_Astar <- calculate_Lap_and_Astar(B, D0, D1)
   Lap <- Lap_and_Astar[[1]]
   Astar <- Lap_and_Astar[[2]]
-  # calculate alpha
-  alpha_without_origin <- calculate_alpha(Lap, Astar, VD, IndexOfRootCell)
-  alpha <-rep(0,nrow(tv1$data))
-  alpha[-tv1$origin$HSC_hitting_time]<-as.numeric(alpha_without_origin)
-  return(alpha)
+  # calculate alpha depending if the root cell is selected or not
+  if (is.null(IndexOfRootCell)){
+    alpha <- calculate_alpha_pseudo_inverse(Lap, Astar, VD)
+    return(alpha)
+    
+  }
+  else{
+    alpha_without_origin <- calculate_alpha(Lap, Astar, VD, IndexOfRootCell)
+    alpha <-rep(0,nrow(tv1$data))
+    alpha[-tv1$origin$HSC_hitting_time]<-as.numeric(alpha_without_origin)
+    return(alpha)
+  }
+
 }
 
-
-
+pseudotime_no_root <- get_pseudotime_from_velocity(tv1, 30)
 pseudotime_50 <- get_pseudotime_from_velocity(tv1, 50, tv1$origin$HSC_hitting_time)
 pseudotime_10 <- get_pseudotime_from_velocity(tv1, 10, tv1$origin$HSC_hitting_time)
 pseudotime_30 <- get_pseudotime_from_velocity(tv1, 30, tv1$origin$HSC_hitting_time)
 pseudotime_90 <- get_pseudotime_from_velocity(tv1, 90, tv1$origin$HSC_hitting_time)
+
+tv1$pseudotime$calculatedPseudotimeNoRoot$res<-as.numeric(pseudotime_no_root)
+tv1$origin$calculatedPseudotimeNoRoot<-which.min(tv1$pseudotime$calculatedPseudotimeNoRoot$res)
+
 tv1$pseudotime$calculatedPseudotime50neighbours$res<-as.numeric(pseudotime_50)
 tv1$origin$calculatedPseudotime50neighbours<-tv1$origin$HSC_hitting_time
 
@@ -76,6 +95,8 @@ tv1$origin$calculatedPseudotime30neighbours<-tv1$origin$HSC_hitting_time
 tv1$pseudotime$calculatedPseudotime90neighbours$res<-as.numeric(pseudotime_90)
 tv1$origin$calculatedPseudotime90neighbours<-tv1$origin$HSC_hitting_time
 
+
+Walks(tv1,N=1000,origin_name = "calculatedPseudotimeNoRoot")
 Walks(tv1,N=1000,origin_name = "calculatedPseudotime30neighbours")
 Walks(tv1,N=1000,origin_name = "calculatedPseudotime10neighbours")
 Walks(tv1,N=1000,origin_name = "calculatedPseudotime50neighbours")
