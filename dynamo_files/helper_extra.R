@@ -17,16 +17,15 @@ calculate_Astar <- function(B, D0, D1) {
   Astar<-D0%*%B%*%D1
   return(Astar)
 }
-calculate_Lap_and_Astar <- function(B, D0, D1) {
+calculate_Lap <- function(B, D0, D1) {
   Lap<-D0%*%B%*%D1%*%t(B)
-  Astar<-calculate_Astar(B,D0,D1)
-  return(list(Lap, Astar))
+  return(Lap)
 }
 
-calculate_Lap_sym_and_Astar <- function(B, D0, D1) {
-  Lap<-D0%*%B%*%D1%*%t(B)
-  Astar<-calculate_Astar(B,D0,D1)
-  return(list(Lap, Astar))
+calculate_Lap_sym <- function(B, D0, D1, Dm) {
+  Lap<-B%*%D1%*%t(B)
+  Lap_sym <- Dm%*%Lap%*%Dm
+  return(Lap_sym)
 }
 
 calculate_alpha <- function(Lap, Astar, VD, IndexOfOriginCell) {
@@ -47,19 +46,21 @@ calculate_alpha_pseudo_inverse <- function(Lap, Astar, VD) {
   return(alpha$x)
 }
 
-get_pseudotime_from_velocity <- function(tv1,nearest_neighbour_number=30, IndexOfRootCell=NULL, MatrixOfVelocity = "RDS") {
+
+
+get_pseudotime_from_velocity <- function(tv1, nearest_neighbour_number=30, IndexOfRootCell=NULL, MatrixOfVelocity = "RDS", lap_symmetrical = F) {
   # create graph and extract edges from transition matrix
   graph <- create_graph_from_transition_matrix(tv1, nearest_neighbour_number)
   transition_matrix <- graph[[1]]
-  G <- graph[[2]]
+  G <<- graph[[2]]
   listOfEdges <- graph[[3]]
   # calculate complex and boundary
   flt<-c(1:nrow(tv1$data),listOfEdges)
-  B<-calculate_complex_and_boundary(flt)
+  B<<-calculate_complex_and_boundary(flt)
   
   # load data
   if (MatrixOfVelocity == "RDS"){
-    V<-readRDS("/data/results/Hematopoiesis/hematopoiesis_PCA_velocity.RDS")}
+    V<-readRDS("/data/dynamo_files/results/Hematopoiesis/hematopoiesis_PCA_velocity.RDS")}
   else{
     V <- MatrixOfVelocity
   }
@@ -67,10 +68,15 @@ get_pseudotime_from_velocity <- function(tv1,nearest_neighbour_number=30, IndexO
   VD<-deRahmMap1f(B = B,X = X,V = V)
   D0<-Matrix::Diagonal(x=rowSums(transition_matrix)^-1)
   D1<-Matrix::Diagonal(x=E(G)$weight)
+  Astar <- calculate_Astar(B,D0,D1)
   # calculate Lap and A*
-  Lap_and_Astar <- calculate_Lap_and_Astar(B, D0, D1)
-  Lap <- Lap_and_Astar[[1]]
-  Astar <- Lap_and_Astar[[2]]
+  if (lap_symmetrical){
+    Dm <- Matrix::Diagonal(x=rowSums(transition.matrix(tv1))^(-1/2))
+    Lap <- calculate_Lap_sym(B, D0, D1, Dm)
+  }
+  else{
+  Lap <- calculate_Lap(B, D0, D1)
+  }
   # calculate alpha depending if the root cell is selected or not
   if (is.null(IndexOfRootCell)){
     alpha <- calculate_alpha_pseudo_inverse(Lap, Astar, VD)
@@ -88,6 +94,7 @@ get_pseudotime_from_velocity <- function(tv1,nearest_neighbour_number=30, IndexO
 
 pseudotime_no_root <- get_pseudotime_from_velocity(tv1, 30)
 pseudotime_50 <- get_pseudotime_from_velocity(tv1, 50, tv1$origin$HSC_hitting_time)
+pseudotime_50_sym <- get_pseudotime_from_velocity(tv1, 50, tv1$origin$HSC_hitting_time, lap_symmetrical = T)
 pseudotime_10 <- get_pseudotime_from_velocity(tv1, 10, tv1$origin$HSC_hitting_time)
 pseudotime_30 <- get_pseudotime_from_velocity(tv1, 30, tv1$origin$HSC_hitting_time)
 pseudotime_90 <- get_pseudotime_from_velocity(tv1, 90, tv1$origin$HSC_hitting_time)
@@ -97,6 +104,9 @@ tv1$origin$calculatedPseudotimeNoRoot<-which.min(tv1$pseudotime$calculatedPseudo
 
 tv1$pseudotime$calculatedPseudotime50neighbours$res<-as.numeric(pseudotime_50)
 tv1$origin$calculatedPseudotime50neighbours<-tv1$origin$HSC_hitting_time
+
+tv1$pseudotime$calculatedPseudotime50_SYM_neighbours$res<-as.numeric(pseudotime_50_sym)
+tv1$origin$calculatedPseudotime50_SYM_neighbours<-tv1$origin$HSC_hitting_time
 
 tv1$pseudotime$calculatedPseudotime10neighbours$res<-as.numeric(pseudotime_10)
 tv1$origin$calculatedPseudotime10neighbours<-tv1$origin$HSC_hitting_time
@@ -113,3 +123,15 @@ Walks(tv1,N=1000,origin_name = "calculatedPseudotime30neighbours")
 Walks(tv1,N=1000,origin_name = "calculatedPseudotime10neighbours")
 Walks(tv1,N=1000,origin_name = "calculatedPseudotime50neighbours")
 Walks(tv1,N=1000,origin_name = "calculatedPseudotime90neighbours")
+
+
+from_bound <- calculate_Lap(B,D0,D1)
+
+from_lap <- build_Laplacian_and_RHS(transition.matrix(tv1), origin=tv1$origin$HSC_hitting_time)
+
+from_bound[-tv1$origin$HSC_hitting_time, -tv1$origin$HSC_hitting_time] - from_lap[[1]]
+Dm <- Matrix::Diagonal(x=rowSums(transition.matrix(tv1))^(-1/2))
+
+from_bound <- calculate_Lap_sym(B,D0,D1, Dm)
+from_lap <- build_sym_Laplacian_and_RHS(transition.matrix(tv1), origin=tv1$origin$HSC_hitting_time)
+from_bound[-tv1$origin$HSC_hitting_time, -tv1$origin$HSC_hitting_time] - from_lap[[1]]

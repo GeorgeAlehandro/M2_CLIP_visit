@@ -1,4 +1,4 @@
-#devtools::install_github("stuchly/HodgePaths", ref= "main")
+devtools::install_github("stuchly/HodgePaths", ref= "main")
 library("HodgePaths")
 transition_matrix <-transition.matrix(tv1, 10) 
 G<-graph_from_adjacency_matrix(transition_matrix,weighted = TRUE,mode = "undirected")
