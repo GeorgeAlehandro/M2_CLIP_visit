@@ -1,8 +1,14 @@
 
 
-data<-readRDS("/data/hematopoiesis_PCA.RDS")
-group_id<-readRDS("/data/hematopoiesis_cell_type.RDS")
-thematrrixumap<-readRDS("/data/hematopoiesis_UMAP.RDS")
+# data<-readRDS("/data/hematopoiesis_PCA.RDS")
+# group_id<-readRDS("/data/hematopoiesis_cell_type.RDS")
+# thematrrixumap<-readRDS("/data/hematopoiesis_UMAP.RDS")
+
+data<-readRDS("/data/dynamo_files/results/Hematopoiesis/hematopoiesis_PCA.RDS")
+group_id<-readRDS("/data/dynamo_files/results/Hematopoiesis/hematopoiesis_cell_type.RDS")
+thematrrixumap<-readRDS("/data/dynamo_files/results/Hematopoiesis/hematopoiesis_UMAP.RDS")
+
+
 library(tviblindi)
 tv1<-tviblindi(data=data,labels=group_id)
 DimRed(tv1)

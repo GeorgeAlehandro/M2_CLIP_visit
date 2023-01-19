@@ -12,10 +12,20 @@ calculate_complex_and_boundary <- function(flt) {
   B<-BB[[1]]
   B
 }
-
+# Intermediate 
+calculate_Astar <- function(B, D0, D1) {
+  Astar<-D0%*%B%*%D1
+  return(Astar)
+}
 calculate_Lap_and_Astar <- function(B, D0, D1) {
   Lap<-D0%*%B%*%D1%*%t(B)
-  Astar<-D0%*%B%*%D1
+  Astar<-calculate_Astar(B,D0,D1)
+  return(list(Lap, Astar))
+}
+
+calculate_Lap_sym_and_Astar <- function(B, D0, D1) {
+  Lap<-D0%*%B%*%D1%*%t(B)
+  Astar<-calculate_Astar(B,D0,D1)
   return(list(Lap, Astar))
 }
 
