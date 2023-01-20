@@ -22,9 +22,11 @@ calculate_Lap <- function(B, D0, D1) {
   return(Lap)
 }
 
-calculate_Lap_sym <- function(B, D0, D1, Dm) {
-  Lap<-B%*%D1%*%t(B)
-  Lap_sym <- Dm%*%Lap%*%Dm
+calculate_Lap_sym <- function(B, D0, D1) {
+  Dm <- Matrix::Diagonal(x=diag(D0)^(-1/2))
+  Dm_minus1 <- Matrix::Diagonal(x=diag(Dm)^-1)
+  Lap<<-D0%*%B%*%D1%*%t(B)
+  Lap_sym <- Dm%*%Lap%*%Dm_minus1
   return(Lap_sym)
 }
 
@@ -66,13 +68,12 @@ get_pseudotime_from_velocity <- function(tv1, nearest_neighbour_number=30, Index
   }
   X<-tv1$data
   VD<-deRahmMap1f(B = B,X = X,V = V)
-  D0<-Matrix::Diagonal(x=rowSums(transition_matrix)^-1)
-  D1<-Matrix::Diagonal(x=E(G)$weight)
+  D0<<-Matrix::Diagonal(x=rowSums(transition_matrix)^-1)
+  D1<<-Matrix::Diagonal(x=E(G)$weight)
   Astar <- calculate_Astar(B,D0,D1)
   # calculate Lap and A*
   if (lap_symmetrical){
-    Dm <- Matrix::Diagonal(x=rowSums(transition.matrix(tv1))^(-1/2))
-    Lap <- calculate_Lap_sym(B, D0, D1, Dm)
+    Lap <- calculate_Lap_sym(B, D0, D1)
   }
   else{
   Lap <- calculate_Lap(B, D0, D1)
@@ -130,8 +131,7 @@ from_bound <- calculate_Lap(B,D0,D1)
 from_lap <- build_Laplacian_and_RHS(transition.matrix(tv1), origin=tv1$origin$HSC_hitting_time)
 
 from_bound[-tv1$origin$HSC_hitting_time, -tv1$origin$HSC_hitting_time] - from_lap[[1]]
-Dm <- Matrix::Diagonal(x=rowSums(transition.matrix(tv1))^(-1/2))
 
-from_bound <- calculate_Lap_sym(B,D0,D1, Dm)
+from_bound <- calculate_Lap_sym(B,D0,D1)
 from_lap <- build_sym_Laplacian_and_RHS(transition.matrix(tv1), origin=tv1$origin$HSC_hitting_time)
 from_bound[-tv1$origin$HSC_hitting_time, -tv1$origin$HSC_hitting_time] - from_lap[[1]]
