@@ -1,3 +1,6 @@
+
+devtools::install_github("stuchly/HodgePaths",ref="main")
+library("HodgePaths")
 create_graph_from_transition_matrix <- function(tv1, n) {
   transition_matrix <- transition.matrix(tv1, n) 
   G <- graph_from_adjacency_matrix(transition_matrix,weighted = TRUE,mode = "undirected")
@@ -30,16 +33,23 @@ calculate_Lap_sym <- function(B, D0, D1) {
   return(Lap_sym)
 }
 
-calculate_alpha <- function(Lap, Astar, VD, IndexOfOriginCell) {
+calculate_alpha <- function(Lap, Astar, VD, IndexOfOriginCell,lap_symmetrical) {
   right_hand <- -(Astar%*%VD)[-IndexOfOriginCell]
   left_hand <- Lap[-IndexOfOriginCell,-IndexOfOriginCell]
   alpha <- solve(left_hand, right_hand)
   return(alpha)
 }
 
-calculate_alpha_pseudo_inverse <- function(Lap, Astar, VD) {
+calculate_alpha_pseudo_inverse <- function(Lap, Astar, VD,lap_symmetrical=F) {
+  if(!lap_symmetrical){
   right_hand <- -(Astar%*%VD)
   left_hand <- Lap
+  }
+  else{
+    Dm <- Matrix::Diagonal(x=diag(D0)^(-1/2))
+    left_hand <- Lap %*% Dm
+    right_hand <- (Dm%*%Astar%*%VD)
+  }
   # leftI<-pracma::pinv(as.matrix(left_hand))
   # alpha<-leftI%*%right_hand
   # AA<<-list(left_hand,right_hand)
@@ -80,12 +90,12 @@ get_pseudotime_from_velocity <- function(tv1, nearest_neighbour_number=30, Index
   }
   # calculate alpha depending if the root cell is selected or not
   if (is.null(IndexOfRootCell)){
-    alpha <- calculate_alpha_pseudo_inverse(Lap, Astar, VD)
+    alpha <- calculate_alpha_pseudo_inverse(Lap, Astar, VD, lap_symmetrical)
     return(alpha)
     
   }
   else{
-    alpha_without_origin <- calculate_alpha(Lap, Astar, VD, IndexOfRootCell)
+    alpha_without_origin <- calculate_alpha(Lap, Astar, VD, IndexOfRootCell,lap_symmetrical)
     alpha <-rep(0,nrow(tv1$data))
     alpha[-tv1$origin$HSC_hitting_time]<-as.numeric(alpha_without_origin)
     return(alpha)
@@ -99,9 +109,12 @@ pseudotime_50_sym <- get_pseudotime_from_velocity(tv1, 50, tv1$origin$HSC_hittin
 pseudotime_10 <- get_pseudotime_from_velocity(tv1, 10, tv1$origin$HSC_hitting_time)
 pseudotime_30 <- get_pseudotime_from_velocity(tv1, 30, tv1$origin$HSC_hitting_time)
 pseudotime_90 <- get_pseudotime_from_velocity(tv1, 90, tv1$origin$HSC_hitting_time)
-
+test <- get_pseudotime_from_velocity(tv1, 90, lap_symmetrical = T )
 tv1$pseudotime$calculatedPseudotimeNoRoot$res<-as.numeric(pseudotime_no_root)
 tv1$origin$calculatedPseudotimeNoRoot<-which.min(tv1$pseudotime$calculatedPseudotimeNoRoot$res)
+
+tv1$pseudotime$symNoRoot$res<-as.numeric(test)
+tv1$origin$symNoRoot<-which.min(tv1$pseudotime$symNoRoot$res)
 
 tv1$pseudotime$calculatedPseudotime50neighbours$res<-as.numeric(pseudotime_50)
 tv1$origin$calculatedPseudotime50neighbours<-tv1$origin$HSC_hitting_time

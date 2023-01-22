@@ -1,5 +1,5 @@
 devtools::install_github('dynverse/dyntoy')
-devtools::install_github("dynverse/dyno")
+#devtools::install_github("dynverse/dyno")
 library(dyno)
 library(tidyverse)
 n_events <- 5000
@@ -22,7 +22,7 @@ library(tviblindi)
 tv1_dyno_data<-tviblindi(data=data,labels=group_id)
 DimRed(tv1_dyno_data)
 DimRed(tv1_dyno_data,method="umap")
-simplify_trajectory(tv1_dyno_data)
+#simplify_trajectory(tv1_dyno_data)
 Set_origin(tv1_dyno_data,label = "M4",origin_name = "M4_hitting_time")
 Set_origin(tv1_dyno_data,label = "M4",origin_name = "M4_hitting_distance")
 
