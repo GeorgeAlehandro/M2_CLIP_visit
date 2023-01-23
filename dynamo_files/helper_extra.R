@@ -27,7 +27,6 @@ calculate_Lap <- function(B, D0, D1) {
 
 calculate_Lap_sym <- function(B, D0, D1) {
   Dm <- Matrix::Diagonal(x=diag(D0)^(1/2))
-  Dm_minus1 <- Matrix::Diagonal(x=diag(Dm)^-1)
   Lap_sym<-Dm%*%B%*%D1%*%t(B)%*%Dm
   # Lap_sym <- Dm%*%Lap%*%Dm_minus1
   return(Lap_sym)
@@ -40,29 +39,24 @@ calculate_alpha <- function(Lap, Astar, VD, IndexOfOriginCell,lap_symmetrical) {
   return(alpha)
 }
 
-calculate_alpha_pseudo_inverse <- function(Lap, Astar, VD,lap_symmetrical=F) {
+calculate_alpha_pseudo_inverse <- function(Lap, Astar, D0, VD,lap_symmetrical=F) {
   if(!lap_symmetrical){
   right_hand <- -(Astar%*%VD)
   left_hand <- Lap
   alpha<-HodgePaths:::bicgSparse(left_hand,as.numeric(right_hand),nb_iter = 1500)
+  alpha<-alpha$x
   }
   else{
     Dm_minus <- Matrix::Diagonal(x=diag(D0)^(-1/2))
     Dm_minus_inverse <- Matrix::Diagonal(x=diag(Dm_minus)^(-1))
     left_hand <<- Lap
-    right_hand <<- (Dm_minus%*%Astar%*%VD)
-    alpha<-HodgePaths:::bicgSparse(left_hand,as.numeric(right_hand),nb_iter = 1500)
-    return(Dm_minus_inverse%*%alpha$x)
-    print(dim(Dm_minus_inverse))
-  #  epsilon<<-HodgePaths:::cgSparse(left_hand,as.numeric(right_hand), iguess = as.numeric(Matrix::Diagonal(x=rep(0.0, nrow(D0)))), nb_iter = 1500)
- #   alpha <- Dm_minus_inverse%*%Matrix::Diagonal(x=diag(epsilon))
+    right_hand <<- -(Dm_minus%*%Astar%*%VD)
+  epsilon<<-HodgePaths:::bicgSparse(left_hand,as.numeric(right_hand), nb_iter = 1500)
+ alpha <- Dm_minus_inverse%*%epsilon$x
+ #  epsilon<<-solve(left_hand,as.numeric(right_hand))
+  # alpha <- Dm_minus_inverse%*%epsilon
   }
-  # leftI<-pracma::pinv(as.matrix(left_hand))
-  # alpha<-leftI%*%right_hand
-  # AA<<-list(left_hand,right_hand)
-  
-  print(alpha$error)
-  return(alpha$x)
+    return(alpha)
 }
 
 
@@ -97,12 +91,13 @@ get_pseudotime_from_velocity <- function(tv1, nearest_neighbour_number=30, Index
   }
   # calculate alpha depending if the root cell is selected or not
   if (is.null(IndexOfRootCell)){
-    alpha <- calculate_alpha_pseudo_inverse(Lap, Astar, VD, lap_symmetrical)
+    print(lap_symmetrical)
+    alpha <- calculate_alpha_pseudo_inverse(Lap, Astar, VD, D0=D0, lap_symmetrical=lap_symmetrical)
     return(alpha)
     
   }
   else{
-    alpha_without_origin <- calculate_alpha(Lap, Astar, VD, IndexOfRootCell,lap_symmetrical)
+    alpha_without_origin <- calculate_alpha(Lap, Astar, VD, IndexOfRootCell,lap_symmetrical=lap_symmetrical)
     alpha <-rep(0,nrow(tv1$data))
     alpha[-tv1$origin$HSC_hitting_time]<-as.numeric(alpha_without_origin)
     return(alpha)
@@ -116,6 +111,7 @@ pseudotime_50_sym <- get_pseudotime_from_velocity(tv1, 50, tv1$origin$HSC_hittin
 pseudotime_10 <- get_pseudotime_from_velocity(tv1, 10, tv1$origin$HSC_hitting_time)
 pseudotime_30 <- get_pseudotime_from_velocity(tv1, 30, tv1$origin$HSC_hitting_time)
 pseudotime_90 <- get_pseudotime_from_velocity(tv1, 90, tv1$origin$HSC_hitting_time)
+
 test <- get_pseudotime_from_velocity(tv1, 90, lap_symmetrical = T )
 test_non_sym <- get_pseudotime_from_velocity(tv1, 90, lap_symmetrical = F )
 

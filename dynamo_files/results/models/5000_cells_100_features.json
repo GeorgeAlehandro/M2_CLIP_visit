@@ -1,0 +1,1 @@
+{"original_dim": 100, "encoder_shape": [128.0, 128.0, 128.0], "decoder_shape": [128.0, 128.0, 128.0], "latent_dim": 2, "perplexity": 10.0, "metric": "euclidean", "margin": 1.0, "ww": [10.0, 10.0, 1.0, 1.0], "name": "Vaevictis"}
