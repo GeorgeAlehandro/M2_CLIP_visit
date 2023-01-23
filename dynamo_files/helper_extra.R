@@ -26,10 +26,10 @@ calculate_Lap <- function(B, D0, D1) {
 }
 
 calculate_Lap_sym <- function(B, D0, D1) {
-  Dm <- Matrix::Diagonal(x=diag(D0)^(-1/2))
+  Dm <- Matrix::Diagonal(x=diag(D0)^(1/2))
   Dm_minus1 <- Matrix::Diagonal(x=diag(Dm)^-1)
-  Lap<<-D0%*%B%*%D1%*%t(B)
-  Lap_sym <- Dm%*%Lap%*%Dm_minus1
+  Lap_sym<-Dm%*%B%*%D1%*%t(B)%*%Dm
+  # Lap_sym <- Dm%*%Lap%*%Dm_minus1
   return(Lap_sym)
 }
 
@@ -44,16 +44,23 @@ calculate_alpha_pseudo_inverse <- function(Lap, Astar, VD,lap_symmetrical=F) {
   if(!lap_symmetrical){
   right_hand <- -(Astar%*%VD)
   left_hand <- Lap
+  alpha<-HodgePaths:::bicgSparse(left_hand,as.numeric(right_hand),nb_iter = 1500)
   }
   else{
-    Dm <- Matrix::Diagonal(x=diag(D0)^(-1/2))
-    left_hand <- Lap %*% Dm
-    right_hand <- (Dm%*%Astar%*%VD)
+    Dm_minus <- Matrix::Diagonal(x=diag(D0)^(-1/2))
+    Dm_minus_inverse <- Matrix::Diagonal(x=diag(Dm_minus)^(-1))
+    left_hand <<- Lap
+    right_hand <<- (Dm_minus%*%Astar%*%VD)
+    alpha<-HodgePaths:::bicgSparse(left_hand,as.numeric(right_hand),nb_iter = 1500)
+    return(Dm_minus_inverse%*%alpha$x)
+    print(dim(Dm_minus_inverse))
+  #  epsilon<<-HodgePaths:::cgSparse(left_hand,as.numeric(right_hand), iguess = as.numeric(Matrix::Diagonal(x=rep(0.0, nrow(D0)))), nb_iter = 1500)
+ #   alpha <- Dm_minus_inverse%*%Matrix::Diagonal(x=diag(epsilon))
   }
   # leftI<-pracma::pinv(as.matrix(left_hand))
   # alpha<-leftI%*%right_hand
   # AA<<-list(left_hand,right_hand)
-  alpha<-HodgePaths:::bicgSparse(left_hand,as.numeric(right_hand),nb_iter = 1500)
+  
   print(alpha$error)
   return(alpha$x)
 }
@@ -110,11 +117,18 @@ pseudotime_10 <- get_pseudotime_from_velocity(tv1, 10, tv1$origin$HSC_hitting_ti
 pseudotime_30 <- get_pseudotime_from_velocity(tv1, 30, tv1$origin$HSC_hitting_time)
 pseudotime_90 <- get_pseudotime_from_velocity(tv1, 90, tv1$origin$HSC_hitting_time)
 test <- get_pseudotime_from_velocity(tv1, 90, lap_symmetrical = T )
-tv1$pseudotime$calculatedPseudotimeNoRoot$res<-as.numeric(pseudotime_no_root)
-tv1$origin$calculatedPseudotimeNoRoot<-which.min(tv1$pseudotime$calculatedPseudotimeNoRoot$res)
+test_non_sym <- get_pseudotime_from_velocity(tv1, 90, lap_symmetrical = F )
 
 tv1$pseudotime$symNoRoot$res<-as.numeric(test)
 tv1$origin$symNoRoot<-which.min(tv1$pseudotime$symNoRoot$res)
+
+tv1$pseudotime$NoRoot$res<-as.numeric(test_non_sym)
+tv1$origin$NoRoot<-which.min(tv1$pseudotime$NoRoot$res)
+
+tv1$pseudotime$calculatedPseudotimeNoRoot$res<-as.numeric(pseudotime_no_root)
+tv1$origin$calculatedPseudotimeNoRoot<-which.min(tv1$pseudotime$calculatedPseudotimeNoRoot$res)
+
+
 
 tv1$pseudotime$calculatedPseudotime50neighbours$res<-as.numeric(pseudotime_50)
 tv1$origin$calculatedPseudotime50neighbours<-tv1$origin$HSC_hitting_time
