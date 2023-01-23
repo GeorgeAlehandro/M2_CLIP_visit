@@ -1,4 +1,6 @@
 devtools::install_github('dynverse/dyntoy')
+devtools::install_github("dynverse/dyno")
+devtools::install_github("PeterZZQ/VeloSim")
 #devtools::install_github("dynverse/dyno")
 #library(dyno)
 #library(tidyverse)
@@ -56,5 +58,5 @@ pseudotime_no_root <- get_pseudotime_from_velocity(tv1_dyno_data, 30, MatrixOfVe
 
 tv1_dyno_data$pseudotime$NoRoot$res<-as.numeric(pseudotime_no_root)
 tv1_dyno_data$origin$NoRoot<-which.min(tv1$pseudotime$NoRoot$res)
-
+Walks(tv1_dyno_data,N=1000,origin_name = "NoRoot") 
 launch_shiny(tv1_dyno_data)
