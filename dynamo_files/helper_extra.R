@@ -99,7 +99,7 @@ get_pseudotime_from_velocity <- function(tv1, nearest_neighbour_number=30, Index
   else{
     alpha_without_origin <- calculate_alpha(Lap, Astar, VD, IndexOfRootCell,lap_symmetrical=lap_symmetrical)
     alpha <-rep(0,nrow(tv1$data))
-    alpha[-tv1$origin$HSC_hitting_time]<-as.numeric(alpha_without_origin)
+    alpha[-IndexOfRootCell]<-as.numeric(alpha_without_origin)
     return(alpha)
   }
   

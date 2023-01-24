@@ -1,4 +1,4 @@
-max(tv1$clusters)
+max(tv1$clusters)#
 plot(tv1$layout$lay[,1], tv1$layout$lay[,2])
 mean_clusters <- data.frame()
 library(dplyr)
