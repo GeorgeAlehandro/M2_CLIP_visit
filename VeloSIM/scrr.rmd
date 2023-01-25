@@ -22,7 +22,7 @@ library(VeloSim)
 # number of total cells
 ncells_total <- 2000
 # number of total genes
-ngenes <- 100
+ngenes <- 1000
 # total number of evfs: homo-evf + diff-evf
 nevf <- 20
 # number of diff-evf
@@ -132,18 +132,65 @@ plot<-plotBackbone(result, dr = "umap")
 ```
 
 ```{r}
+count_s_pca <- prcomp(t(result$counts_s), scale. = T, center = T)
+```
 
+```{r}
+# Extract rotation matrix and scale values from the output of the first PCA
+rotation_matrix <- count_s_pca$rotation
+scale_values <- count_s_pca$scale
+
+# Perform PCA on second dataset using the same rotation matrix and scale values
+#velocity_pca <- prcomp(t(result$velocity), center = TRUE, scale. = TRUE, rotation = rotation_matrix, scale = scale_values)
+scaled_velocity <- scale(t(result$velocity), center = TRUE, scale = scale_values)
+
+# Multiply the scaled second dataset by the rotation matrix from the first PCA
+velocity_pca <- scaled_velocity %*% rotation_matrix
+
+```
+
+```{r}
+count_s_100_pca <- count_s_pca[["x"]][,1:100]
+velocity_100_pca <- velocity_pca[,1:100]
 ```
 
 ```{r}
 export_simulation <- list()
   export_simulation$counts_u <- result$counts_u
+  export_simulation$counts_s_PCA <- as.matrix(count_s_100_pca)
   export_simulation$counts_s <- result$counts_s
   export_simulation$backbone <- result$backbone
   export_simulation$velocity <- result$velocity
+  export_simulation$velocity_100_pca <- velocity_100_pca
 ```
 
 ```{r}
-saveRDS(export_simulation, "/data/2000_100_0.2.rds")
+saveRDS(export_simulation, "/data/VeloSIM/datasets/2000_100_0.2.rds")
+```
+
+```{r}
+write.csv(as.data.frame(t(result$counts_u)),"/data/data_frames_to_anndata/2000_100_0.2_unspliced.csv")
+write.csv(as.data.frame(t(result$counts_s)),"/data/data_frames_to_anndata/2000_100_0.2_spliced.csv")
+write.csv(as.data.frame(result$backbone),"/data/data_frames_to_anndata/backbone.csv")
+```
+
+
+
+```{r}
+library("anndata")
+reticulate::install_miniconda()
+```
+```{r}
+my_adata <- AnnData(var = result$counts_u[0,],
+                    X = result$counts_u[,0])
+```
+# Extract firt 100 PCAS
+```{r}
+
+
+```
+
+```{r}
+write.csv(count_s_100_pca,"/data/data_frames_to_anndata/2000_100_0.2_unspliced.csv")
 ```
 

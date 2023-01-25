@@ -14,7 +14,8 @@
 simulated_data <- readRDS("/data/VeloSIM/datasets/2000_100_0.2.rds")
 
 library(tviblindi)
-tv1<-tviblindi(data=scale(t(simulated_data$counts_s)),labels=as.factor(simulated_data$backbone))
+#tv1<-tviblindi(data=scale(t(simulated_data$counts_s)),labels=as.factor(simulated_data$backbone))
+tv1<-tviblindi(data=(simulated_data$counts_s_PCA),labels=as.factor(simulated_data$backbone))
 DimRed(tv1)
 DimRed(tv1,method="umap")
 
@@ -27,7 +28,7 @@ Filtration(tv1) #default setting is too conservative, less simplices could be cr
 Pseudotime(tv1,weighted = FALSE,origin_name = "5_6_hitting_time")
 Walks(tv1,N=1000,origin_name = "5_6_hitting_time")
 
-pseudotime_no_root <- get_pseudotime_from_velocity(tv1, 50, MatrixOfVelocity = t(simulated_data$velocity))
+pseudotime_no_root <- get_pseudotime_from_velocity(tv1, 50, MatrixOfVelocity = simulated_data$velocity_100_pca)
 tv1$pseudotime$calculatedPseudotimeNoRoot$res<-as.numeric(pseudotime_no_root)
 tv1$origin$calculatedPseudotimeNoRoot<-which.min(tv1$pseudotime$calculatedPseudotimeNoRoot$res)
 Walks(tv1,N=1000,origin_name = "calculatedPseudotimeNoRoot")
