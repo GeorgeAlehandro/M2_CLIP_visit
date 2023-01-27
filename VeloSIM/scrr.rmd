@@ -182,7 +182,11 @@ reticulate::install_miniconda()
 ```
 ```{r}
 my_adata <- AnnData(var = result$counts_u[0,],
-                    X = result$counts_u[,0])
+                    X = result$counts_u[,0],
+                      layers = list(
+    spliced =result$counts_s,
+    unspliced = result$counts_u
+  ))
 ```
 # Extract firt 100 PCAS
 ```{r}
