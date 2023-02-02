@@ -1,0 +1,21 @@
+    1  docker exec -it 652ea4e3fb25 /bin/bash
+apt-get update && \
+  apt-get upgrade -y && \
+  apt-get install -y \
+    libhdf5-dev \
+    libcurl4-gnutls-dev \
+    libssl-dev \
+    libxml2-dev \
+    libpng-dev \
+    libxt-dev \
+    zlib1g-dev \
+    libbz2-dev \
+    liblzma-dev \
+    libglpk40 \
+  && apt-get clean all && \
+  apt-get purge && \
+  rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+sudo apt-get install patch
+    2  apt-get update && apt-get install patch
+    3  history > /data/dockersetup

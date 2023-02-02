@@ -1,0 +1,296 @@
+---
+title: "Using Seurat with BD Rhapsody multi-omic single-cell data"
+output:
+  html_document:
+    df_print: paged
+---
+```{css style settings, echo = FALSE}
+blockquote {
+    padding: 10px 20px;
+    margin: 0 0 20px;
+    font-size: 14px;
+    border-left: 5px solid #eee;
+}
+```
+
+This is an introduction on how to install and use the [Seurat](https://satijalab.org/seurat/) package to analyze single-cell data produced by the BD Rhapsody Sequence Analysis Pipeline.  
+Demo data used for this example can be found [here](https://bd-rhapsody-public.s3.amazonaws.com/Rhapsody-Demo-Data/VDJ/RhapTCRBCRdemo.zip).
+This tutorial was tested on `R-4.2.1` with `Seurat-4.2.0`.
+
+> About the demo data:
+> 
+> This experiment used previously frozen resting human PBMCs and enriched human B cells that were multiplexed and stained with Immune Discovery Panel + 4 AbSeq drop-ins and a 15-plex Abseq panel, respectively, whereby ~10,000 cells were captured with the BD Rhapsody Single Cell System and processed using the BD Rhapsody TCR/BCR Full Length, mRNA Whole Transcriptome Analysis (WTA), BD AbSeq, and Sample Tag Library Preparation protocol.
+
+
+## Installation requirements
+### Getting started with R and RStudio
+R is a freely available language and environment for statistical computing and graphics which can be installed from here: [R download](https://cran.r-project.org/)  Note: R version has to be above 4.0.0 to run Seurat.
+
+[RStudio](https://www.rstudio.com/) is a integrated development environment for R, with a console, syntax-highlighting editor that supports direct code execution.  First time users of R may find this easier to use, and it's available as a community supported open source edition.  Within RStudio, the commands below can be run in the console, but it is recommended to start a "R Notebook" to allow for dynamic execution and copying in blocks of the code.
+
+### Installation of Seurat
+[Seurat](https://cran.r-project.org/package=Seurat) is available on CRAN (Comprehensive R Archive Network) for all platforms. To install, input following command in R console or run in the RStudio console. One can also install Seurat in RStudio using Tools menu > Install Packages and search for Seurat.  If asked "Do you want to install from sources the packages which need compilation? (Yes/no/cancel)" - no is the safest answer, unless your system is set up to compile from source.
+
+```{r results='hide'}
+# Installing from CRAN
+# Enter commands in R (or R studio, if installed)
+install.packages('Seurat', repos = "http://cran.us.r-project.org")
+```
+
+
+## Load Rhapsody data in R and import into Seurat
+Load the Rhapsody expression data into a R data frame, using the output MolsPerCell CSV file i.e. `[Run_name]_RSEC_MolsPerCell.csv.  This file contains molecule counts for both mRNA and/or AbSeq expression.
+```{r eval = TRUE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
+demo_expression = data.table::fread("./RhapTCRBCRdemo/Combined_RhapTCRBCRdemo_RSEC_MolsPerCell.csv", header = TRUE, skip=7)
+```
+
+Next, set the row and column names, then transpose the existing data frame using `t()` function. 
+```{r eval = TRUE, warning=FALSE}
+# Transpose data frame for object creation
+demo_expression_tp = data.frame(t(demo_expression), check.names = FALSE)
+# Set column names
+demo_expression_tp = data.frame(setNames(demo_expression_tp[-1,], unlist(demo_expression_tp[1,])), check.names = FALSE)
+```
+
+Load the Seurat package and create a Seurat object containing the expression data.
+```{r load-packages, warning=FALSE, results='hide'}
+library(Seurat)
+```
+
+```{r eval = TRUE, warning=FALSE}
+# Create Seurat Object
+demo_seurat_object = CreateSeuratObject(counts = demo_expression_tp, project = "Rhapsody Seurat Demo")
+demo_seurat_object
+```
+The last line will print out details on the Seurat object that was created - indicating the number of features (mRNA or other bioproducts) and samples (number of cells).
+
+
+## Quality control and selecting cells for further analysis
+Quality control steps are often performed in order to filter out low quality cells. In this example, we remove cells with:  
+
+1. High mitochondrial counts
+2. Abnormally high or low number of distinct expressed bioproducts (mRNA/AbSeq)
+
+These filtering criteria are determined through the QC steps shown below:
+```{r eval = TRUE, warning=FALSE, fig.width = 12, fig.height = 6}
+# The [[ operator can add columns to object metadata. This is a great place to stash QC stats
+demo_seurat_object[["percent.mt"]] <- PercentageFeatureSet(demo_seurat_object, pattern = "^MT.")
+# Visualize QC metrics as a violin plot
+VlnPlot(demo_seurat_object, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+```
+
+nFeature_RNA is the number of distinct bioproducts detected a cell  
+nCount_RNA is the total number of molecules detected within a cell 
+
+From the violin plot above, we can determine the filtering criteria of:
+
+1. Remove cells with >20% mitochondria content;
+2. Remove cells with <200 or >4000 bioproducts  (mRNA/AbSeq)
+
+
+Use the command below to filter the Seurat Object:
+```{r eval = TRUE, warning=FALSE}
+demo_seurat_object <- subset(demo_seurat_object, subset = percent.mt < 20 & nFeature_RNA > 200 & nFeature_RNA < 4000)
+```
+
+## Visualize with Dimensionality Reduction (t-SNE)
+T-distributed stochastic neighbor embedding (t-SNE) is a method for visualizing high-dimensional single-cell data by giving each cell a location in a two or three-dimensional map.  Cells are arranged such that they are nearby other similar cells.
+
+First, perform normalization to scale each bioproduct expression by the total expression:
+```{r eval = TRUE, warning=FALSE}
+demo_seurat_object = NormalizeData(demo_seurat_object)
+```
+Then, find a set of bioproducts that are highly variable between cells; the `nfeatures` parameter in the command indicates that it will return the 2000 most variable bioproducts.
+```{r eval = TRUE, warning=FALSE, fig.width = 12, fig.height = 6}
+demo_seurat_object <- FindVariableFeatures(demo_seurat_object, selection.method = "vst", nfeatures = 2000)
+
+# Identify the 10 most highly variable genes
+top10variable <- head(VariableFeatures(demo_seurat_object), 10)
+
+# plot variable features with labels
+variableFeaturePlot <- VariableFeaturePlot(demo_seurat_object)
+variableFeaturePlotWithLabels <- LabelPoints(plot = variableFeaturePlot, points = top10variable, repel = TRUE, xnudge = 0, ynudge = 0)
+variableFeaturePlotWithLabels
+```
+
+Next, a linear transformation, or scaling, will be performed on the data. This step is required for the next PCA step:
+
+```{r eval = TRUE, warning=FALSE, results='hide', message=FALSE}
+rna_name = row.names(demo_seurat_object)
+demo_seurat_object = ScaleData(demo_seurat_object, features = rna_name, model.use = "linear")
+```
+
+Following the scaling, a linear dimensional reduction will be performed on the data; we will use the variable features calculated by the previous step here in the `features` parameter.
+```{r eval = TRUE, warning=FALSE, results='hide', message=FALSE}
+demo_seurat_object = RunPCA(demo_seurat_object, features = VariableFeatures(object=demo_seurat_object), verbose = F)
+```
+
+Finally, we create the Seurat object for t-SNE analysis; if running UMAP is desired, use `RunUMAP()` here instead:
+```{r eval=TRUE}
+demo_seurat_object = RunTSNE(object = demo_seurat_object, tsne.method = "Rtsne", dims = 1:20, perplexity=70, learning.rate = 200)
+```
+
+Then, view the TSNE plot using following command:
+```{r eval=TRUE}
+DimPlot(demo_seurat_object) + NoLegend()
+```
+
+## t-SNE Analysis - Viewing Features
+Using the following command to view the expression of a single bioproduct in t-SNE, in this case, the CD19 AbSeq marker:
+```{r eval=TRUE, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
+# TSNE plot for a single feature:
+FeaturePlot(demo_seurat_object, features = c("CD127-IL7R-AHS0028-pAbO"), cols = c('#DAD7D6','#FF6E00'), pt.size = 0.3)
+```
+
+Or add more features to the command for a grid-view plot with all desired features:
+```{r eval = TRUE, tidy=TRUE, fig.height = 9, fig.width = 9, fig.align = "center"}
+# Create multiple plots for more than one features at the same time:
+FeaturePlot(demo_seurat_object, features = c("FCGR3A", "CD16-3G8-FCGR3A-AHS0053-pAbO", "HLA-DR-CD74-AHS0035-pAbO", "IgG-IGHG1-2-3-4-AHS0059-pAbO", "CD4", "IGKC"), cols = c('#DAD7D6','#FF6E00'), pt.size = 0.3)
+```
+
+
+## Adding Annotation Data
+### Sample Multiplexing Tags
+If the experiment used the BD Single-Cell Multiplexing kit, add the Sample Tag cell calls as an annotation, and visualize with t-SNE:
+```{r eval = TRUE, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
+demo_tag_meta <- read.table("./RhapTCRBCRdemo/RhapTCRBCRdemo_Sample_Tag_Calls.csv", skip = 0, sep = ",", header = TRUE, row.names = 1)
+demo_seurat_object = AddMetaData(object = demo_seurat_object, metadata = demo_tag_meta)
+DimPlot(demo_seurat_object, group.by = "Sample_Tag", pt.size = 0.3)
+```
+
+### Cell Type (Experimental)
+The Rhapsody Sequence Analysis Pipeline contains an experimental cell classification model trained on human PBMC cells.  If relevant to your sample, load and view the classifications:
+```{r eval = TRUE, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
+demo_celltype_meta <- read.table("./RhapTCRBCRdemo/Combined_RhapTCRBCRdemo_cell_type_experimental.csv", skip = 0, sep = ",", header = TRUE, row.names = 1)
+demo_seurat_object = AddMetaData(object = demo_seurat_object, metadata = demo_celltype_meta)
+DimPlot(demo_seurat_object, group.by = "Cell_Type_Experimental", pt.size = 0.3)
+```
+
+
+### TCR/BCR Assay
+If the experiment used BD Rhapsody TCR/BCR assay, load the VDJ per cell output with the VDJ_perCell.csv file.  
+```{r eval = TRUE, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
+vdj_table_assay = read.table("./RhapTCRBCRdemo/RhapTCRBCRdemo_VDJ_perCell.csv", header = TRUE, row.names = 1, sep = ",")
+demo_seurat_object = AddMetaData(object = demo_seurat_object, metadata = vdj_table_assay)
+
+```
+
+#### B cell analysis example
+In this example, we first show the cells with both an identified heavy and light chain BCR ("paired"), side by side with the cells that were classified as B cells.  Then, we filter the BCR result for the top 10 BCR Heavy CDR3 amino acid sequences, and make a bar plot. Note: the bar plot requires `ggplot2` package; to install, do `install.packages('ggplot2')`. We will also create a t-SNE plot with each cells B cell heavy chain constant region.
+```{r eval = TRUE, tidy=TRUE, tidy.opts=list(width.cutoff=60), fig.height = 4, fig.width = 9, fig.align = "center"}
+# Showing the BCR paired chains = TRUE in t-SNE
+# Copy the cell type column to a data frame for transformation
+b_filter_df = data.frame(demo_seurat_object$Cell_Type_Experimental)
+# Transform the data frame to only include B cells
+b_filter_df = transform(b_filter_df,
+          demo_seurat_object.Cell_Type_Experimental = factor(replace(as.character(demo_seurat_object.Cell_Type_Experimental), 
+                              list = !demo_seurat_object.Cell_Type_Experimental %in% c("B"),
+                              values = "")))
+# Copy back the data frame to the Seurat object with only B cell
+demo_seurat_object[["Cell_Type_Experimental_B_Only"]] = b_filter_df$demo_seurat_object.Cell_Type_Experimental
+plot_bo = DimPlot(demo_seurat_object, group.by="Cell_Type_Experimental_B_Only", cols = c('#DAD7D6','#FF6E00'), pt.size = 0.3)
+plot_bcrPaired = DimPlot(demo_seurat_object, group.by="BCR_Paired_Chains", cols = c('#DAD7D6','#6EFF00'), pt.size = 0.3)
+plot_bo + plot_bcrPaired
+
+# Filter the object for cell type and BCR paired chains 
+bc_vdj_sub = subset(x = demo_seurat_object, subset = Cell_Type_Experimental=="B")
+bc_vdj_sub = subset(x = bc_vdj_sub, subset = BCR_Paired_Chains=="True")
+```
+
+```{r eval = TRUE, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
+# build data frame for bar plot
+bhc <- data.frame(table(demo_seurat_object$BCR_Heavy_CDR3_Translation_Dominant))
+bhc <- bhc[order(bhc$Freq, decreasing = TRUE),]
+# remove NAs
+bhc <- bhc[rowSums(is.na(bhc)) != ncol(bhc),]
+bhc[bhc==""]<-NA
+bhc = na.omit(bhc)
+# filter the top 10 sequence
+bhc_top10 <- head(bhc, 10)
+library(ggplot2)
+# generate the bar plot
+ggplot(bhc_top10, aes(x = reorder(Var1, -Freq), y=Freq)) + 
+  theme(axis.text.x=element_text(angle=90,hjust=1)) +
+  xlab("BCR_Heavy_CDR3_Translation_Dominant")+
+  ylab("Frequency")+
+  geom_bar(stat = "identity")
+```
+```{r eval = TRUE, tidy=TRUE, fig.height = 4, fig.width = 9, fig.align = "center"}
+
+# Plot the BCR_Heavy_C_gene_Dominant and Cell_Type_Experimental_B_Only side-by-side
+plot_hc = DimPlot(demo_seurat_object, group.by="BCR_Heavy_C_gene_Dominant", pt.size = 0.3, cols = c('#DAD7D6','#9e0142','#f46d43','#5e4fa2','#fee08b','#e6f598','#abdda4','#3288bd', '#9199D8'))
+plot_bo + plot_hc
+```
+
+
+#### T cell analysis example
+Similar to the above example, we first show the cells with TCR paired chains - those that contain an alpha/beta or gamma/delta chains. Then, we filter the VDJ result for the top 10 TCR Beta/Delta V gene segments to make a bar plot. We will also highlight the top 10 beta delta V genes in t-SNE plot.
+```{r eval = TRUE, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
+# Showing the TCR paired chains = TRUE in t-SNE
+DimPlot(demo_seurat_object, group.by="TCR_Paired_Chains",cols = c('#DAD7D6','#FF6E00'), pt.size = 0.3)
+# Filtering the Seurat object for all Tc types and TCR paired chains
+tc_vdj_sub_cd4m = subset(x = demo_seurat_object, subset = Cell_Type_Experimental=="T_CD4_memory")
+tc_vdj_sub_cd8m = subset(x = demo_seurat_object, subset = Cell_Type_Experimental=="T_CD8_memory")
+tc_vdj_sub_cd4n = subset(x = demo_seurat_object, subset = Cell_Type_Experimental=="T_CD4_naive")
+tc_vdj_sub_cd8n = subset(x = demo_seurat_object, subset = Cell_Type_Experimental=="T_CD8_naive")
+tc_vdj_sub_gd = subset(x = demo_seurat_object, subset = Cell_Type_Experimental=="T_gamma_delta")
+# Merge all date frames with T cells
+tc_vdj_sub = merge(x = tc_vdj_sub_cd4m, y = list(tc_vdj_sub_cd8m, tc_vdj_sub_cd4n, tc_vdj_sub_cd8n, tc_vdj_sub_gd))
+# Filter and only keep those with TCR paired chain = True
+tc_vdj_sub = subset(x = tc_vdj_sub, subset = TCR_Paired_Chains=="True")
+```
+
+
+```{r eval = TRUE, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
+# Build the data frame
+bdvc <- data.frame(table(demo_seurat_object$TCR_Beta_Delta_V_gene_Dominant))
+bdvc <- bdvc[order(bdvc$Freq, decreasing = TRUE),]
+# Remove the NAs
+bdvc <- bdvc[rowSums(is.na(bdvc)) != ncol(bdvc),]
+bdvc[bdvc==""]<-NA
+bdvc = na.omit(bdvc)
+bdvc_top_10 = head(bdvc, 10)
+# Load ggplot2
+library(ggplot2)
+# Build the bar plot on top 10 sequences in frequency
+ggplot(bdvc_top_10, aes(x = reorder(Var1, -Freq), y=Freq)) + 
+  theme(axis.text.x=element_text(angle=90,hjust=1)) +
+  xlab("TCR_Beta_Delta_V_gene_Dominant")+
+  ylab("Frequency")+
+  geom_bar(stat = "identity")
+```
+```{r eval = TRUE, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
+# Copy the column to a data frame for transformation
+TCR_tranform_df = data.frame(demo_seurat_object$TCR_Beta_Delta_V_gene_Dominant)
+# Transform the data frame to only keep the top 10 alleles plotted in the former step
+TCR_tranform_df = transform(TCR_tranform_df,
+          demo_seurat_object.TCR_Beta_Delta_V_gene_Dominant = factor(replace(as.character(demo_seurat_object.TCR_Beta_Delta_V_gene_Dominant), list = !demo_seurat_object.TCR_Beta_Delta_V_gene_Dominant %in% bdvc_top_10$Var1, values = "")))
+# Bring back the transformed column with only the top 10 alleles to the Seurat object as a new column
+demo_seurat_object[["TCR_Beta_Delta_V_gene_top_10"]] = TCR_tranform_df$demo_seurat_object.TCR_Beta_Delta_V_gene_Dominant
+# View the t-SNE plot with highlighted top alleles
+DimPlot(demo_seurat_object, group.by="TCR_Beta_Delta_V_gene_top_10", pt.size = 0.3, cols = c('#DAD7D6','#9e0142','#d53e4f','#f46d43','#5e4fa2','#fee08b','#e6f598','#abdda4','#66c2a5','#3288bd','#fdae61'))
+```
+
+### Supplemental Functions
+Additional examples of graphing that may be useful.
+
+Use the following commands to blend features in TSNE:
+```{r eval = TRUE, warning=FALSE, tidy=TRUE, fig.height = 4, fig.width = 10, fig.align = "center"}
+tsne2_blend = FeaturePlot(demo_seurat_object, features = c("CCR7-CCR7-AHS0273-pAbO", "FOS"), combine = FALSE, blend = TRUE, cols = c('#1D74FF','#FF6E00'))
+blend1 = tsne2_blend[[3]]
+blend2 = tsne2_blend[[4]]
+blend1+blend2
+```
+
+Create a biaxial plot using following command:
+```{r eval = TRUE, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
+# Grouping by Sample Name (from the sample tag csv file) in this case
+FeatureScatter(object = demo_seurat_object, feature1 = "CD137-TNFRSF9-AHS0003-pAbO", feature2 = "CCR7-CCR7-AHS0273-pAbO", group.by = "Sample_Name")
+```
+
+Using the FeatureScatter() function below, we can visualize the correlations between features:
+```{r eval = TRUE, warning=FALSE, fig.width = 12, fig.height = 6}
+plot1 <- FeatureScatter(demo_seurat_object, feature1 = "nCount_RNA", feature2 = "percent.mt") + NoLegend()
+plot2 <- FeatureScatter(demo_seurat_object, feature1 = "nCount_RNA", feature2 = "nFeature_RNA") + NoLegend()
+plot1 + plot2
+```
