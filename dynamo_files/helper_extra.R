@@ -151,7 +151,7 @@ Walks(tv1,N=1000,origin_name = "calculatedPseudotime90neighbours")
 
 from_bound <- calculate_Lap(B,D0,D1)
 
-from_lap <- build_Laplacian_and_RHS(transition.matrix(tv1), origin=tv1$origin$HSC_hitting_time)
+from_lap <- build_Laplacian_and_RHS(transition.matrix(tv1), origin=tv1$origin$`5_6_hitting_time`)
 
 from_bound[-tv1$origin$HSC_hitting_time, -tv1$origin$HSC_hitting_time] - from_lap[[1]]
 

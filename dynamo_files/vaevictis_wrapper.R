@@ -1,13 +1,13 @@
 vv = reticulate::import("vaevictis")
 #model <- vv$loadModel("/data/results/models/config.json","/data/results/models/weights.h5")
-model <- vv$loadModel("/data/dynamo_files/results/models/config.json","/data/dynamo_files/results/models/weights.h5")
+model <- vv$loadModel("/data/patient2_0.5_subsample/patient2.json", "/data/patient2_0.5_subsample/patient2.h5")
 
 #layout <- model[[2]](tv1$data)
 #plot(model[[2]](tv1$data))
 #groups<-readRDS("/data/results/Hematopoiesis/hematopoiesis_cell_type.RDS")
 #velocity<-readRDS("/data/results/Hematopoiesis/hematopoiesis_PCA_velocity.RDS")
-groups<-readRDS("/data/dynamo_files/results/Hematopoiesis/hematopoiesis_cell_type.RDS")
-velocity<-readRDS("/data/dynamo_files/results/Hematopoiesis/hematopoiesis_PCA_velocity.RDS")
+groups<-group_id
+#velocity<-readRDS("/data/dynamo_files/results/Hematopoiesis/hematopoiesis_PCA_velocity.RDS")
 plot(model[[2]](velocity))
 originalPCA_plus_velocity <- tv1$data + 1.2*velocity 
 vaevictis_points <- as.data.frame(model[[2]](tv1$data))
@@ -28,5 +28,6 @@ t <-geom_segment(data = data_arrows, aes(x = x1, y = y1, xend = x2, yend = y2), 
 ggplot() + geom_point(data=vaevictis_points,aes(V1,V2,color="lightgrey")) + t + 
   theme(legend.position = "none")
 vaevictis_points<-as.matrix(vaevictis_points)
-rownames(vaevictis_points) <- NULL
-tv1$layout$lay<-vaevictis_points
+#If need to reload
+#rownames(vaevictis_points) <- NULL
+#tv1$layout$lay<-vaevictis_points

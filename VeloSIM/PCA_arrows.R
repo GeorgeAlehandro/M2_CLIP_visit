@@ -3,11 +3,11 @@ data_counts <- dataset$counts_s_PCA[,1:2]
 velocity<-dataset$velocity_100_pca[,1:2]
 groups<-dataset$backbone
 plot(velocity[,1], velocity[,2])
-originalPCA_plus_velocity <- data_counts + velocity 
-vaevictis_points <- as.data.frame(data_counts)
+originalPCA_plus_velocity <- data + velocity 
+vaevictis_points <- as.data.frame(data)
 vaevictis_velocity <- as.data.frame(originalPCA_plus_velocity)
-vaevictis_velocity$celltypes <- groups
-vaevictis_points$celltypes <- groups
+vaevictis_velocity$celltypes <- group_id
+vaevictis_points$celltypes <- group_id
 library(ggplot2)
 ggplot()+
   geom_point(data=vaevictis_points,aes(PC1,PC2,color=celltypes))

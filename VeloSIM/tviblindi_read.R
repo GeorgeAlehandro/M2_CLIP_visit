@@ -28,21 +28,21 @@ Filtration(tv1) #default setting is too conservative, less simplices could be cr
 Pseudotime(tv1,weighted = FALSE,origin_name = "5_6_hitting_time")
 Walks(tv1,N=1000,origin_name = "5_6_hitting_time")
 
-pseudotime_no_root <- get_pseudotime_from_velocity(tv1, 50, MatrixOfVelocity = simulated_data$velocity_100_pca)
+pseudotime_no_root <- get_pseudotime_from_velocity(tv1, 30, MatrixOfVelocity = simulated_data$velocity_100_pca)
 tv1$pseudotime$calculatedPseudotimeNoRoot$res<-as.numeric(pseudotime_no_root)
 tv1$origin$calculatedPseudotimeNoRoot<-which.min(tv1$pseudotime$calculatedPseudotimeNoRoot$res)
 Walks(tv1,N=1000,origin_name = "calculatedPseudotimeNoRoot")
 
-pseudotime_30 <- get_pseudotime_from_velocity(tv1, 30, IndexOfRootCell=tv1$origin$`5_6_hitting_time`,MatrixOfVelocity = t(simulated_data$velocity))
+pseudotime_30 <- get_pseudotime_from_velocity(tv1, 30, IndexOfRootCell=tv1$origin$`5_6_hitting_time`,MatrixOfVelocity = simulated_data$velocity_100_pca)
 tv1$pseudotime$calculatedPseudotime30neighbours$res<-as.numeric(pseudotime_30)
 tv1$origin$calculatedPseudotime30neighbours<-tv1$origin$`5_6_hitting_time`
 Walks(tv1,N=1000,origin_name = "calculatedPseudotime30neighbours")
 
 
-pseudotime_80 <- get_pseudotime_from_velocity(tv1, 80, IndexOfRootCell=tv1$origin$`5_6_hitting_time`,MatrixOfVelocity = t(simulated_data$velocity))
+pseudotime_80 <- get_pseudotime_from_velocity(tv1, 80, IndexOfRootCell=tv1$origin$`5_6_hitting_time`,MatrixOfVelocity = simulated_data$velocity_100_pca)
 tv1$pseudotime$calculatedPseudotime80neighbours$res<-as.numeric(pseudotime_80)
 tv1$origin$calculatedPseudotime80neighbours<-tv1$origin$`5_6_hitting_time`
-Walks(tv1,N=1000, K=80, origin_name = "calculatedPseudotime80neighbours")
+Walks(tv1,N=1000, origin_name = "calculatedPseudotime80neighbours")
 
 
 launch_shiny(tv1)
