@@ -164,37 +164,47 @@ export_simulation <- list()
   export_simulation$velocity_100_pca <- velocity_100_pca
 ```
 
+# Export the VeloSIM list object as rds, to be read by tviblindi
 ```{r}
 saveRDS(export_simulation, "/data/VeloSIM/datasets/2000_100_0.2.rds")
 ```
-
+### Example
 ```{r}
-write.csv(as.data.frame(t(result$counts_u)),"/data/data_frames_to_anndata/2000_100_0.2_unspliced.csv")
-write.csv(as.data.frame(t(result$counts_s)),"/data/data_frames_to_anndata/2000_100_0.2_spliced.csv")
-write.csv(as.data.frame(result$backbone),"/data/data_frames_to_anndata/backbone.csv")
-```
+simulated_data <- readRDS("/data/VeloSIM/datasets/2000_100_0.2.rds")
+
+library(tviblindi)
+#tv1<-tviblindi(data=scale(t(simulated_data$counts_s)),labels=as.factor(simulated_data$backbone))
+tv1<-tviblindi(data=(simulated_data$counts_s_PCA),labels=as.factor(simulated_data$backbone))
+DimRed(tv1)
+DimRed(tv1,method="umap")
+
+Set_origin(tv1,label = "5_6",origin_name = "5_6_hitting_time")
+
+KNN(tv1)
+Som(tv1,xdim = 15,ydim = 15) #kmeans clustering by default - 15*15 clusters
+Filtration(tv1) #default setting is too conservative, less simplices could be created with same resolution (e.g. Filtration(tv1,alpha2=1))
+
+Pseudotime(tv1,weighted = FALSE,origin_name = "5_6_hitting_time")
+Walks(tv1,N=1000,origin_name = "5_6_hitting_time")
+
+pseudotime_no_root <- get_pseudotime_from_velocity(tv1, 30, MatrixOfVelocity = simulated_data$velocity_100_pca)
+tv1$pseudotime$calculatedPseudotimeNoRoot$res<-as.numeric(pseudotime_no_root)
+tv1$origin$calculatedPseudotimeNoRoot<-which.min(tv1$pseudotime$calculatedPseudotimeNoRoot$res)
+Walks(tv1,N=1000,origin_name = "calculatedPseudotimeNoRoot")
+
+pseudotime_30 <- get_pseudotime_from_velocity(tv1, 30, IndexOfRootCell=tv1$origin$`5_6_hitting_time`,MatrixOfVelocity = simulated_data$velocity_100_pca)
+tv1$pseudotime$calculatedPseudotime30neighbours$res<-as.numeric(pseudotime_30)
+tv1$origin$calculatedPseudotime30neighbours<-tv1$origin$`5_6_hitting_time`
+Walks(tv1,N=1000,origin_name = "calculatedPseudotime30neighbours")
 
 
-
-```{r}
-library("anndata")
-reticulate::install_miniconda()
-```
-```{r}
-my_adata <- AnnData(var = result$counts_u[0,],
-                    X = result$counts_u[,0],
-                      layers = list(
-    spliced =result$counts_s,
-    unspliced = result$counts_u
-  ))
-```
-# Extract firt 100 PCAS
-```{r}
+pseudotime_80 <- get_pseudotime_from_velocity(tv1, 80, IndexOfRootCell=tv1$origin$`5_6_hitting_time`,MatrixOfVelocity = simulated_data$velocity_100_pca)
+tv1$pseudotime$calculatedPseudotime80neighbours$res<-as.numeric(pseudotime_80)
+tv1$origin$calculatedPseudotime80neighbours<-tv1$origin$`5_6_hitting_time`
+Walks(tv1,N=1000, origin_name = "calculatedPseudotime80neighbours")
 
 
-```
+launch_shiny(tv1)
 
-```{r}
-write.csv(count_s_100_pca,"/data/data_frames_to_anndata/2000_100_0.2_unspliced.csv")
 ```
 
