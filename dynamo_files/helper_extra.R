@@ -28,76 +28,58 @@ calculate_Lap <- function(B, D0, D1) {
 calculate_Lap_sym <- function(B, D0, D1) {
   Dm <- Matrix::Diagonal(x=diag(D0)^(1/2))
   Lap_sym<-Dm%*%B%*%D1%*%t(B)%*%Dm
-  # Lap_sym <- Dm%*%Lap%*%Dm_minus1
   return(Lap_sym)
 }
-
-calculate_alpha <- function(Lap, Astar, VD, IndexOfOriginCell,lap_symmetrical) {
-  right_hand <- -(Astar%*%VD)[-IndexOfOriginCell]
+# Calculate pseudotime with root cell selected using symmetrical laplacean
+calculate_alpha <- function(Lap, Astar, VD, IndexOfOriginCell) {
+  Dm_minus <- Matrix::Diagonal(x=diag(D0)^(-1/2))
+  Dm_minus_inverse <- Matrix::Diagonal(x=diag(Dm_minus)^(-1))
   left_hand <- Lap[-IndexOfOriginCell,-IndexOfOriginCell]
-  alpha <- solve(left_hand, right_hand)
+  right_hand <- -(Dm_minus%*%Astar%*%VD)[-IndexOfOriginCell]
+  epsilon<-HodgePaths:::bicgSparse(left_hand,as.numeric(right_hand), nb_iter = 1500)
+  alpha <- Dm_minus_inverse[-IndexOfOriginCell,-IndexOfOriginCell]%*%epsilon$x
   return(alpha)
 }
 
-calculate_alpha_pseudo_inverse <- function(Lap, Astar, D0, VD,lap_symmetrical=F) {
-  if(!lap_symmetrical){
-  right_hand <- -(Astar%*%VD)
+# Calculate pseudotime without any root cell selected using symmetrical laplacean
+calculate_alpha_pseudo_inverse <- function(Lap, Astar, D0, VD) {
+  Dm_minus <- Matrix::Diagonal(x=diag(D0)^(-1/2))
+  Dm_minus_inverse <- Matrix::Diagonal(x=diag(Dm_minus)^(-1))
   left_hand <- Lap
-  alpha<-HodgePaths:::bicgSparse(left_hand,as.numeric(right_hand),nb_iter = 1500)
-  alpha<-alpha$x
-  }
-  else{
-    Dm_minus <- Matrix::Diagonal(x=diag(D0)^(-1/2))
-    Dm_minus_inverse <- Matrix::Diagonal(x=diag(Dm_minus)^(-1))
-    left_hand <<- Lap
-    right_hand <<- -(Dm_minus%*%Astar%*%VD)
-  epsilon<<-HodgePaths:::bicgSparse(left_hand,as.numeric(right_hand), nb_iter = 1500)
- alpha <- Dm_minus_inverse%*%epsilon$x
- #  epsilon<<-solve(left_hand,as.numeric(right_hand))
-  # alpha <- Dm_minus_inverse%*%epsilon
-  }
-    return(alpha)
+  right_hand <- -(Dm_minus%*%Astar%*%VD)
+  epsilon<-HodgePaths:::bicgSparse(left_hand,as.numeric(right_hand), nb_iter = 1500)
+  alpha <- Dm_minus_inverse%*%epsilon$x
+  return(alpha)
 }
 
 
 
-get_pseudotime_from_velocity <- function(tv1, nearest_neighbour_number=30, IndexOfRootCell=NULL, MatrixOfVelocity = "RDS", lap_symmetrical = F) {
+get_pseudotime_from_velocity <- function(tv1, nearest_neighbour_number=30, IndexOfRootCell=NULL, MatrixOfVelocity = velocity) {
   # create graph and extract edges from transition matrix
   graph <- create_graph_from_transition_matrix(tv1, nearest_neighbour_number)
   transition_matrix <- graph[[1]]
-  G <<- graph[[2]]
+  G <- graph[[2]]
   listOfEdges <- graph[[3]]
   # calculate complex and boundary
   flt<-c(1:nrow(tv1$data),listOfEdges)
-  B<<-calculate_complex_and_boundary(flt)
+  B<-calculate_complex_and_boundary(flt)
   
   # load data
-  if (MatrixOfVelocity == "RDS"){
-    V<-readRDS("/data/dynamo_files/results/Hematopoiesis/hematopoiesis_PCA_velocity.RDS")}
-  else{
-    V <- MatrixOfVelocity
-  }
+  V <- as.matrix(MatrixOfVelocity)
   X<-tv1$data
   VD<-deRahmMap1f(B = B,X = X,V = V)
   D0<<-Matrix::Diagonal(x=rowSums(transition_matrix)^-1)
   D1<<-Matrix::Diagonal(x=E(G)$weight)
   Astar <- calculate_Astar(B,D0,D1)
   # calculate Lap and A*
-  if (lap_symmetrical){
-    Lap <- calculate_Lap_sym(B, D0, D1)
-  }
-  else{
-  Lap <- calculate_Lap(B, D0, D1)
-  }
+  Lap <- calculate_Lap_sym(B, D0, D1)
   # calculate alpha depending if the root cell is selected or not
   if (is.null(IndexOfRootCell)){
-    print(lap_symmetrical)
-    alpha <- calculate_alpha_pseudo_inverse(Lap, Astar, VD, D0=D0, lap_symmetrical=lap_symmetrical)
+    alpha <- calculate_alpha_pseudo_inverse(Lap, Astar, VD, D0=D0)
     return(alpha)
-    
   }
   else{
-    alpha_without_origin <- calculate_alpha(Lap, Astar, VD, IndexOfRootCell,lap_symmetrical=lap_symmetrical)
+    alpha_without_origin <- calculate_alpha(Lap, Astar, VD, IndexOfRootCell)
     alpha <-rep(0,nrow(tv1$data))
     alpha[-IndexOfRootCell]<-as.numeric(alpha_without_origin)
     return(alpha)
@@ -112,6 +94,7 @@ pseudotime_10 <- get_pseudotime_from_velocity(tv1, 10, tv1$origin$HSC_hitting_ti
 pseudotime_30 <- get_pseudotime_from_velocity(tv1, 30, tv1$origin$HSC_hitting_time)
 pseudotime_90 <- get_pseudotime_from_velocity(tv1, 90, tv1$origin$HSC_hitting_time)
 
+# Old test
 test <- get_pseudotime_from_velocity(tv1, 90, lap_symmetrical = T )
 test_non_sym <- get_pseudotime_from_velocity(tv1, 90, lap_symmetrical = F )
 

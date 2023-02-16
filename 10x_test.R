@@ -1,4 +1,5 @@
-data<-read.csv("/data/10X_analysis/X_pca.csv")
+data<-read.csv("10X_analysis/X_pca.csv")
+#data<-readRDS("/data/10X_analysis/pca_AFTER_embed_after_seurat.RDS")
 group_id<-tv0$labels[[1]]
 
 library(tviblindi)
@@ -16,7 +17,7 @@ Filtration(tv3) #default setting is too conservative, less simplices could be cr
 Pseudotime(tv3,weighted = TRUE,origin_name = "A_B_blasts") 
 Walks(tv3,N=1000,origin_name = "A_B_blasts") 
 
-tv3$vae$save("/data/10X_analysis/model.json", "/data/10X_analysis/model.h5")
+#tv3$vae$save("/data/10X_analysis/model.json", "/data/10X_analysis/model.h5")
 ##Adding un-rooted RNA velocity method
 velocity <- read.csv("/data/10X_analysis/Velocity_pca.csv")
 
@@ -27,7 +28,7 @@ Walks(tv3,N=1000,origin_name = "calculatedPseudotimeNoRoot")
 
 
 singler_labels <- readRDS("10X_analysis/singleR_annotation.RDS")
-tv3$labels<-singler_labels
+tv3$labels<-tv0$labels[[1]]
 launch_shiny(tv3)
 
 
