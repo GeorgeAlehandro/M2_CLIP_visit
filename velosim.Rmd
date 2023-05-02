@@ -1,0 +1,148 @@
+---
+title: "velosim"
+output: html_document
+date: '2023-04-27'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+install.packages("phytools")
+devtools::install_github("PeterZZQ/VeloSim")
+```
+
+
+```{r}
+library(VeloSim)
+```
+
+## Step 1: Define the simulation parameters
+```{r params_setting}
+velosim_experiment <- function(ncells, ngenes=1000, capture_probability = 0.2){
+# number of total cells
+ncells_total <- ncells
+# number of total genes
+ngenes <- ngenes
+# total number of evfs: homo-evf + diff-evf
+nevf <- 20
+# number of diff-evf
+n_de_evf <- 12
+# which kinetic parameters is changed according to the sampling position, n_de_evf is used in s
+vary <- "all"
+# the standard deviation of the gaussian distribution, denote the noise size
+Sigma <- 0.1
+# the mean of the homo-evf, gaussian distribution again
+evf_center <- 1
+# with which probability the gene effect value is preserved
+gene_effect_prob <- 0.3
+# the mean of the gaussian distribution of gene effect
+geffect_mean <- 0
+# the standard deviation of the gaussian distribution of gene effect
+gene_effects_sd <- 1
+# the real data to obtain the kinetic parameter distribution from
+param_realdata <- "zeisel.imputed"
+bimod <- 0
+scale_s <- 1
+randseed <- 2
+output_file_name <- paste0("/DATA_DISK/velosim/",ncells,"_",ngenes,"_",capture_probability,".rds")
+# read in tree
+phyla <- ape::read.tree(system.file("extdata", "Newick_ABCD.txt", package = "VeloSim"))
+par(mfrow=c(1,2))
+plot(phyla)
+result_true <- SimulateVeloTree(ncells_total=ncells_total,ngenes=ngenes, evf_center=1,nevf=nevf,
+                           phyla=phyla, randseed=randseed, n_de_evf=n_de_evf,vary=vary,Sigma=Sigma,geffect_mean=geffect_mean,
+                           gene_effects_sd=gene_effects_sd,gene_effect_prob=gene_effect_prob,
+                           bimod=bimod,param_realdata=param_realdata,scale_s=scale_s,
+                           prop_hge=0.015, mean_hge=5, n_unstable=0, plot = FALSE)
+# add technical noise
+result <- technicalNoise(result_true, capture.rate = capture_probability)
+count_s_pca <- prcomp(t(result$counts_s), scale. = T, center = T)
+# Extract rotation matrix and scale values from the output of the first PCA
+rotation_matrix <- count_s_pca$rotation
+scale_values <- count_s_pca$scale
+# Perform PCA on second dataset using the same rotation matrix and scale values
+#velocity_pca <- prcomp(t(result$velocity), center = TRUE, scale. = TRUE, rotation = rotation_matrix, scale = scale_values)
+scaled_velocity <- scale(t(result$velocity), center = TRUE, scale = scale_values)
+# Multiply the scaled second dataset by the rotation matrix from the first PCA
+velocity_pca <- scaled_velocity %*% rotation_matrix
+count_s_100_pca <- count_s_pca[["x"]][,1:100]
+velocity_100_pca <- velocity_pca[,1:100]
+export_simulation <- list()
+  export_simulation$counts_u <- result$counts_u
+  export_simulation$counts_s_PCA <- as.matrix(count_s_100_pca)
+  export_simulation$counts_s <- result$counts_s
+  export_simulation$backbone <- result$backbone
+  export_simulation$velocity <- result$velocity
+  export_simulation$velocity_100_pca <- velocity_100_pca
+saveRDS(export_simulation, output_file_name)
+print("Done")
+print(output_file_name)
+
+}
+```
+
+```{r}
+velosim_experiment(4000, 1000, 0.2)
+velosim_experiment(2000, 1000, 0.4)
+velosim_experiment(2000, 1000, 0.6)
+```
+
+### Example
+```{r}
+simulated_data <- readRDS("/DATA_DISK/velosim/2000_100_0.2.rds")
+library(tviblindi)
+#tv1<-tviblindi(data=scale(t(simulated_data$counts_s)),labels=as.factor(simulated_data$backbone))
+tv1<-tviblindi(data=(simulated_data$counts_s_PCA),labels=as.factor(simulated_data$backbone))
+DimRed(tv1)
+DimRed(tv1,method="umap")
+Set_origin(tv1,label = "5_6",origin_name = "5_6_hitting_time")
+KNN(tv1)
+Som(tv1,xdim = 15,ydim = 15) #kmeans clustering by default - 15*15 clusters
+Filtration(tv1) #default setting is too conservative, less simplices could be created with same resolution (e.g. Filtration(tv1,alpha2=1))
+Pseudotime(tv1,weighted = FALSE,origin_name = "5_6_hitting_time")
+Walks(tv1,N=1000,origin_name = "5_6_hitting_time")
+pseudotime_no_root <- get_pseudotime_from_velocity(tv1, 30, MatrixOfVelocity = simulated_data$velocity_100_pca)
+tv1$pseudotime$calculatedPseudotimeNoRoot$res<-as.numeric(pseudotime_no_root)
+tv1$origin$calculatedPseudotimeNoRoot<-which.min(tv1$pseudotime$calculatedPseudotimeNoRoot$res)
+Walks(tv1,N=1000,origin_name = "calculatedPseudotimeNoRoot")
+pseudotime_30 <- get_pseudotime_from_velocity(tv1, 30, IndexOfRootCell=tv1$origin$`5_6_hitting_time`,MatrixOfVelocity = simulated_data$velocity_100_pca)
+tv1$pseudotime$calculatedPseudotime30neighbours$res<-as.numeric(pseudotime_30)
+tv1$origin$calculatedPseudotime30neighbours<-tv1$origin$`5_6_hitting_time`
+Walks(tv1,N=1000,origin_name = "calculatedPseudotime30neighbours")
+pseudotime_80 <- get_pseudotime_from_velocity(tv1, 80, IndexOfRootCell=tv1$origin$`5_6_hitting_time`,MatrixOfVelocity = simulated_data$velocity_100_pca)
+tv1$pseudotime$calculatedPseudotime80neighbours$res<-as.numeric(pseudotime_80)
+tv1$origin$calculatedPseudotime80neighbours<-tv1$origin$`5_6_hitting_time`
+Walks(tv1,N=1000, origin_name = "calculatedPseudotime80neighbours")
+launch_shiny(tv1)
+```
+
+```{r}
+simulated_data <- readRDS("/DATA_DISK/velosim/4000_1000_0.2.rds")
+library(tviblindi)
+#tv_4000_1000_02<-tviblindi(data=scale(t(simulated_data$counts_s)),labels=as.factor(simulated_data$backbone))
+tv_4000_1000_02<-tviblindi(data=(simulated_data$counts_s_PCA),labels=as.factor(simulated_data$backbone))
+DimRed(tv_4000_1000_02)
+DimRed(tv_4000_1000_02,method="umap")
+Set_origin(tv_4000_1000_02,label = "5_6",origin_name = "5_6_hitting_time")
+KNN(tv_4000_1000_02)
+Som(tv_4000_1000_02,xdim = 15,ydim = 15) #kmeans clustering by default - 15*15 clusters
+Filtration(tv_4000_1000_02) #default setting is too conservative, less simplices could be created with same resolution (e.g. Filtration(tv_4000_1000_02,alpha2=1))
+Pseudotime(tv_4000_1000_02,weighted = FALSE,origin_name = "5_6_hitting_time")
+Walks(tv_4000_1000_02,N=1000,origin_name = "5_6_hitting_time")
+pseudotime_no_root <- get_pseudotime_from_velocity(tv_4000_1000_02, 30, MatrixOfVelocity = simulated_data$velocity_100_pca)
+tv_4000_1000_02$pseudotime$calculatedPseudotimeNoRoot$res<-as.numeric(pseudotime_no_root)
+tv_4000_1000_02$origin$calculatedPseudotimeNoRoot<-which.min(tv_4000_1000_02$pseudotime$calculatedPseudotimeNoRoot$res)
+Walks(tv_4000_1000_02,N=1000,origin_name = "calculatedPseudotimeNoRoot")
+pseudotime_30 <- get_pseudotime_from_velocity(tv_4000_1000_02, 30, IndexOfRootCell=tv_4000_1000_02$origin$`5_6_hitting_time`,MatrixOfVelocity = simulated_data$velocity_100_pca)
+tv_4000_1000_02$pseudotime$calculatedPseudotime30neighbours$res<-as.numeric(pseudotime_30)
+tv_4000_1000_02$origin$calculatedPseudotime30neighbours<-tv_4000_1000_02$origin$`5_6_hitting_time`
+Walks(tv_4000_1000_02,N=1000,origin_name = "calculatedPseudotime30neighbours")
+pseudotime_80 <- get_pseudotime_from_velocity(tv_4000_1000_02, 80, IndexOfRootCell=tv_4000_1000_02$origin$`5_6_hitting_time`,MatrixOfVelocity = simulated_data$velocity_100_pca)
+tv_4000_1000_02$pseudotime$calculatedPseudotime80neighbours$res<-as.numeric(pseudotime_80)
+tv_4000_1000_02$origin$calculatedPseudotime80neighbours<-tv_4000_1000_02$origin$`5_6_hitting_time`
+Walks(tv_4000_1000_02,N=1000, origin_name = "calculatedPseudotime80neighbours")
+launch_shiny(tv_4000_1000_02)
+```
+
